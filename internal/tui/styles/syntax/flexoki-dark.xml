@@ -1,0 +1,59 @@
+<style name="flexoki-dark">
+  <!-- Dark theme based on Flexoki colors https://stephango.com/flexoki -->
+
+  <entry type="LineHighlight" style="bg:#282726"/>
+  <entry type="LineNumbers" style="#6F6E69"/>
+  <entry type="LineNumbersTable" style="#6F6E69"/>
+  <entry type="Error" style="#D14D41"/>
+
+  <entry type="Keyword" style="#8B7EC8"/>
+  <entry type="KeywordConstant" style="#3AA99F"/>
+  <entry type="KeywordType" style="#D0A215"/>
+
+  <entry type="Name" style="#CECDC3"/>
+  <entry type="NameBuiltin" style="#3AA99F"/>
+  <entry type="NameBuiltinPseudo" style="#3AA99F"/>
+  <entry type="NameClass" style="#D0A215"/>
+  <entry type="NameConstant" style="#DA702C"/>
+  <entry type="NameDecorator" style="#CE5D97"/>
+  <entry type="NameEntity" style="#DA702C"/>
+  <entry type="NameException" style="#D14D41"/>
+  <entry type="NameFunction" style="#4385BE"/>
+  <entry type="NameLabel" style="#CE5D97"/>
+  <entry type="NameNamespace" style="#D0A215"/>
+  <entry type="NameTag" style="#8B7EC8"/>
+  <entry type="NameAttribute" style="#4385BE"/>
+  <entry type="NameProperty" style="#4385BE"/>
+  <entry type="NameVariable" style="#CECDC3"/>
+
+  <entry type="Literal" style="#879A39"/>
+  <entry type="LiteralString" style="#879A39"/>
+  <entry type="LiteralStringDoc" style="italic #6F6E69"/>
+  <entry type="LiteralStringEscape" style="#D0A215"/>
+  <entry type="LiteralStringInterpol" style="#DA702C"/>
+  <entry type="LiteralStringRegex" style="#D0A215"/>
+  <entry type="LiteralStringSymbol" style="#3AA99F"/>
+  <entry type="LiteralNumber" style="#DA702C"/>
+
+  <entry type="Operator" style="#CE5D97"/>
+  <entry type="OperatorWord" style="#8B7EC8"/>
+
+  <entry type="Punctuation" style="#878580"/>
+
+  <entry type="Comment" style="italic #6F6E69"/>
+  <entry type="CommentPreproc" style="#CE5D97"/>
+  <entry type="CommentPreprocFile" style="#879A39"/>
+
+  <entry type="GenericDeleted" style="#D14D41"/>
+  <entry type="GenericEmph" style="italic"/>
+  <entry type="GenericError" style="#D14D41"/>
+  <entry type="GenericHeading" style="bold #4385BE"/>
+  <entry type="GenericInserted" style="#879A39"/>
+  <entry type="GenericOutput" style="#878580"/>
+  <entry type="GenericPrompt" style="bold #878580"/>
+  <entry type="GenericStrong" style="bold"/>
+  <entry type="GenericSubheading" style="bold #4385BE"/>
+  <entry type="GenericTraceback" style="#D14D41"/>
+
+  <entry type="Text" style="#CECDC3"/>
+</style>

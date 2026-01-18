@@ -1,0 +1,126 @@
+= APISKA
+:figure-caption!:
+:seal-of-approval: image:seal-of-approval.png[BY ALL MEANS]
+
+A skankin' TUI for the AWS RDS Data API.
+
+AWS provides Data-API access (e.g, using `aws rds-data` CLI).
+APISKA takes it one step beyond. You better start to move your
+feet to the rockin'est, rocksteady beat!
+
+
+== A Message to You, Rudy
+
+* Need a human-friendly interface?
+  Pick it up, pick it up, pick it up!
+* Want to sift through data instead of CLI arguments?
+  Pick it up, pick it up, pick it up!
+* Tired of wrestling with formatting output?
+  Pick it up, pick it up, pick it up!
+
+
+== Is it any good?
+
+[.text-center]
+https://news.ycombinator.com/item?id=3067434[{seal-of-approval}]
+
+
+== Usage
+
+APISKA requires three parameters to connect to your RDS cluster:
+
+[cols="1,1,2"]
+|===
+| Flag | Environment Variable | Description
+
+| `--cluster-arn`
+| `APISKA_CLUSTER_ARN`
+| ARN of your RDS cluster
+
+| `--secret-arn`
+| `APISKA_SECRET_ARN`
+| ARN of the Secrets Manager secret containing database credentials
+
+| `--database`
+| `APISKA_DATABASE`
+| Name of the database to connect to
+|===
+
+=== Examples
+
+Using command-line flags:
+
+[source,bash]
+----
+apiska \
+  --cluster-arn arn:aws:rds:us-east-1:123456789012:cluster:my-cluster \
+  --secret-arn arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret \
+  --database mydb
+----
+
+Using environment variables:
+
+[source,bash]
+----
+export APISKA_CLUSTER_ARN=arn:aws:rds:us-east-1:123456789012:cluster:my-cluster
+export APISKA_SECRET_ARN=arn:aws:secretsmanager:us-east-1:123456789012:secret:my-secret
+export APISKA_DATABASE=mydb
+
+apiska
+----
+
+You can mix flags and environment variables. Flags take precedence over environment variables.
+
+
+== License
+
+APISKA is released under the GNU Affero General Public License v3 (AGPL-3.0).
+
+=== What This Means for You
+
+The AGPL-3.0 has two main triggers: *distribution* and *network interaction
+with modified versions*. Here's how they apply:
+
+*Running APISKA (modified or not)*::
+You can freely run APISKA for any purpose - personal, commercial, internal
+company use - without any obligations. The license explicitly grants unlimited
+permission to run the program (Section 2).
+
+*Modifying APISKA for private use*::
+You can modify APISKA for your own use without sharing your changes, as long as
+you don't distribute it or provide network access to users.
+
+*Distributing APISKA*::
+If you distribute APISKA (modified or unmodified) - as a binary, bundled in an
+installer, included in a product - you must provide the complete source code
+under AGPL-3.0 to recipients.
+
+*Using APISKA as a library*::
+If you link against or embed APISKA in your software, the combined work becomes
+subject to AGPL-3.0 when distributed. Your entire codebase that incorporates
+APISKA must be released under AGPL-3.0.
+
+*Network interaction with modifications (Section 13)*::
+If you modify APISKA and users interact with your modified version over a
+network, you must offer those users access to the source code. This applies even
+without traditional "distribution". Note: this clause applies only to *modified*
+versions.
+
+=== In Plain Terms
+
+*"I'm a developer using APISKA to query my company's RDS databases"*::
+No obligations. You're simply running the software.
+
+*"I want to run APISKA (modified or not) internally at my company"*::
+No obligations, as long as you don't distribute it and external users don't
+interact with your modified version over a network. Internal employees accessing
+an internal server don't trigger Section 13.
+
+*"I want to ship APISKA as part of my product"*::
+You must license your combined work under AGPL-3.0 and provide source code to
+anyone who receives it.
+
+*"I want to use APISKA's code as a library in my application"*::
+If you distribute your application, it must be licensed under AGPL-3.0 with
+source available.
+
