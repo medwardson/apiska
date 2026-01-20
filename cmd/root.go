@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/ixti/apiska/internal/rds"
+	"github.com/ixti/apiska/internal/tui"
 )
 
 var rootCmd = &cobra.Command{
@@ -55,7 +56,7 @@ func initConfig() {
 
 func run(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
-	_, err := rds.NewClient(ctx, &rds.ClientConfig{
+	client, err := rds.NewClient(ctx, &rds.ClientConfig{
 		ClusterARN: viper.GetString("cluster-arn"),
 		SecretARN:  viper.GetString("secret-arn"),
 		Database:   viper.GetString("database"),
@@ -65,7 +66,11 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize AWS RDS client: %w", err)
 	}
 
-	// HIC SUNT DRACONES
+	p := tui.NewProgram(client)
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("unexpected apiska error: %v", err)
+		os.Exit(1)
+	}
 
 	return nil
 }
