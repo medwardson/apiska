@@ -8,20 +8,17 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/ixti/apiska/internal/rds"
-	"github.com/ixti/apiska/internal/storage"
 	"github.com/ixti/apiska/internal/tui/styles"
 )
 
 type homeScreen struct {
-	client  *rds.Client
-	store   *storage.Store
 	queries []*rds.Query
 	table   table.Model
 
 	width, height int
 }
 
-func newHomeScreen(client *rds.Client, store *storage.Store) *homeScreen {
+func newHomeScreen() *homeScreen {
 	columns := []table.Column{
 		{Title: "Label", Width: 20},
 		{Title: "Time", Width: 20},
@@ -34,8 +31,6 @@ func newHomeScreen(client *rds.Client, store *storage.Store) *homeScreen {
 	)
 
 	return &homeScreen{
-		client:  client,
-		store:   store,
 		queries: []*rds.Query{},
 		table:   t,
 	}
@@ -72,24 +67,17 @@ func (s *homeScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyEnter:
 			if q := s.selectedQuery(); q != nil {
-				screen := newQueryScreen(q)
-				screen.client = s.client
-				screen.store = s.store
 				return s, func() tea.Msg {
-					return PushScreenMsg{Screen: screen}
+					return openQueryMsg{query: q, execute: false}
 				}
 			}
 			return s, nil
 
 		case tea.KeyCtrlN:
-			return s, func() tea.Msg {
-				return PushScreenMsg{Screen: newEditorScreen(s.client, s.store, "")}
-			}
+			return s, func() tea.Msg { return openEditorMsg{} }
 
 		case tea.KeyCtrlL:
-			return s, func() tea.Msg {
-				return PushScreenMsg{Screen: newSavedScreen(s.store)}
-			}
+			return s, func() tea.Msg { return openSavedQueriesMsg{} }
 		}
 
 	case queryAddedMsg:

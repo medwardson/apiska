@@ -69,7 +69,7 @@ func (s *savedScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			if q := s.selectedQuery(); q != nil {
 				return s, func() tea.Msg {
-					return loadSavedQueryMsg{sql: q.SQL}
+					return openEditorMsg{sql: q.SQL}
 				}
 			}
 			return s, nil

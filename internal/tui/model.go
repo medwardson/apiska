@@ -27,13 +27,27 @@ type Screen interface {
 	KeyHints() string
 }
 
-// PushScreenMsg pushes a new screen onto the stack.
-type PushScreenMsg struct {
-	Screen Screen
-}
-
 // PopScreenMsg pops the current screen from the stack.
 type PopScreenMsg struct{}
+
+// openEditorMsg opens the editor screen with optional initial SQL.
+type openEditorMsg struct {
+	sql string
+}
+
+// openSavedQueriesMsg opens the saved queries screen.
+type openSavedQueriesMsg struct{}
+
+// openSavePromptMsg opens the save prompt for the given SQL.
+type openSavePromptMsg struct {
+	sql string
+}
+
+// openQueryMsg opens a query screen to view/execute a query.
+type openQueryMsg struct {
+	query   *rds.Query
+	execute bool
+}
 
 // queryAddedMsg is sent when a query should be added to history.
 type queryAddedMsg struct {
@@ -50,18 +64,6 @@ type queryExecutedMsg struct {
 type editorFinishedMsg struct {
 	editor *launchers.ExternalEditor
 	err    error
-}
-
-// submitQueryMsg is sent when a query is submitted for execution.
-// It handles: adding to history, popping editor, pushing query screen, starting execution.
-type submitQueryMsg struct {
-	query  *rds.Query
-	screen Screen
-}
-
-// loadSavedQueryMsg is sent when a saved query should be loaded into a new editor.
-type loadSavedQueryMsg struct {
-	sql string
 }
 
 // querySavedMsg is sent when a query has been saved successfully.
@@ -108,20 +110,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-	case PushScreenMsg:
-		m.screens = append(m.screens, msg.Screen)
-		// Forward current window size to the new screen
-		if m.width > 0 && m.height > 0 {
-			updated, _ := msg.Screen.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-			m.screens[len(m.screens)-1] = updated.(Screen)
-		}
-		return m, msg.Screen.Init()
-
 	case PopScreenMsg:
 		if len(m.screens) > 1 {
 			m.screens = m.screens[:len(m.screens)-1]
 		}
 		return m, nil
+
+	case openEditorMsg:
+		return m, m.pushScreen(newEditorScreen(m.client, msg.sql))
+
+	case openSavedQueriesMsg:
+		return m, m.pushScreen(newSavedScreen(m.store))
+
+	case openSavePromptMsg:
+		return m, m.pushScreen(newSaveScreen(m.store, msg.sql, m.width))
+
+	case openQueryMsg:
+		// Add query to home screen history if executing
+		if msg.execute && len(m.screens) > 0 {
+			updated, _ := m.screens[0].Update(queryAddedMsg{query: msg.query})
+			m.screens[0] = updated.(Screen)
+		}
+		// Pop current screen (editor) if executing
+		if msg.execute && len(m.screens) > 1 {
+			m.screens = m.screens[:len(m.screens)-1]
+		}
+		// Push query screen
+		screen := newQueryScreen(m.client, msg.query)
+		if msg.execute {
+			screen.executing = true
+		}
+		cmd := m.pushScreen(screen)
+		if msg.execute {
+			return m, tea.Batch(cmd, screen.executeQuery())
+		}
+		return m, cmd
 
 	case queryAddedMsg:
 		// Forward to home screen (first in stack) to update query history
@@ -147,35 +170,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screens[0] = updated.(Screen)
 		}
 		return m, cmd
-
-	case submitQueryMsg:
-		// Add query to home screen history
-		if len(m.screens) > 0 {
-			updated, _ := m.screens[0].Update(queryAddedMsg{query: msg.query})
-			m.screens[0] = updated.(Screen)
-		}
-		// Pop current screen (editor)
-		if len(m.screens) > 1 {
-			m.screens = m.screens[:len(m.screens)-1]
-		}
-		// Push query screen and start execution
-		m.screens = append(m.screens, msg.screen)
-		// Forward current window size to the new screen
-		if m.width > 0 && m.height > 0 {
-			updated, _ := msg.screen.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-			m.screens[len(m.screens)-1] = updated.(Screen)
-		}
-		return m, msg.screen.Init()
-
-	case loadSavedQueryMsg:
-		// Push editor with SQL (keep saved queries screen in stack for back navigation)
-		screen := newEditorScreen(m.client, m.store, msg.sql)
-		m.screens = append(m.screens, screen)
-		if m.width > 0 && m.height > 0 {
-			updated, _ := screen.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-			m.screens[len(m.screens)-1] = updated.(Screen)
-		}
-		return m, screen.Init()
 	}
 
 	// Delegate to the current screen
@@ -227,16 +221,21 @@ func formatHint(key, desc string) string {
 	return styles.HintKey.Render(key) + " " + styles.HintDesc.Render(desc)
 }
 
-// ContentSize returns the available size for screen content.
-func (m model) ContentSize() (width, height int) {
-	return m.width, m.height - 1
+// pushScreen adds a screen to the stack, forwards window size, and returns its Init cmd.
+func (m *model) pushScreen(screen Screen) tea.Cmd {
+	m.screens = append(m.screens, screen)
+	if m.width > 0 && m.height > 0 {
+		updated, _ := screen.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+		m.screens[len(m.screens)-1] = updated.(Screen)
+	}
+	return screen.Init()
 }
 
 func NewProgram(client *rds.Client, store *storage.Store) *tea.Program {
 	return tea.NewProgram(model{
 		client:  client,
 		store:   store,
-		screens: []Screen{newHomeScreen(client, store)},
+		screens: []Screen{newHomeScreen()},
 	})
 }
 

@@ -17,7 +17,6 @@ import (
 	"github.com/ixti/apiska/internal/formatters"
 	"github.com/ixti/apiska/internal/launchers"
 	"github.com/ixti/apiska/internal/rds"
-	"github.com/ixti/apiska/internal/storage"
 	"github.com/ixti/apiska/internal/tui/styles"
 )
 
@@ -34,7 +33,6 @@ type csvExportedMsg struct {
 
 type queryScreen struct {
 	client    *rds.Client
-	store     *storage.Store
 	query     *rds.Query
 	table     table.Model
 	executing bool
@@ -47,7 +45,7 @@ type queryScreen struct {
 	width, height int
 }
 
-func newQueryScreen(query *rds.Query) *queryScreen {
+func newQueryScreen(client *rds.Client, query *rds.Query) *queryScreen {
 	t := table.New(
 		table.WithColumns([]table.Column{}),
 		table.WithRows([]table.Row{}),
@@ -55,8 +53,9 @@ func newQueryScreen(query *rds.Query) *queryScreen {
 	)
 
 	return &queryScreen{
-		query: query,
-		table: t,
+		client: client,
+		query:  query,
+		table:  t,
 	}
 }
 
@@ -80,9 +79,6 @@ func (s *queryScreen) KeyHints() string {
 }
 
 func (s *queryScreen) Init() tea.Cmd {
-	if s.executing && s.client != nil {
-		return s.executeQuery()
-	}
 	return nil
 }
 
@@ -104,10 +100,9 @@ func (s *queryScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlN:
 			// Clone: pop current screen and open editor with current SQL
-			initialSQL := s.query.SQL
 			return s, tea.Sequence(
 				func() tea.Msg { return PopScreenMsg{} },
-				func() tea.Msg { return PushScreenMsg{Screen: newEditorScreen(s.client, s.store, initialSQL)} },
+				func() tea.Msg { return openEditorMsg{sql: s.query.SQL} },
 			)
 		case tea.KeyCtrlE:
 			// Export as CSV

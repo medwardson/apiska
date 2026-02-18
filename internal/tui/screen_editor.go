@@ -11,13 +11,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/ixti/apiska/internal/launchers"
 	"github.com/ixti/apiska/internal/rds"
-	"github.com/ixti/apiska/internal/storage"
 	"github.com/ixti/apiska/internal/tui/styles"
 )
 
 type editorScreen struct {
 	client   *rds.Client
-	store    *storage.Store
 	textarea textarea.Model
 	err      error
 	saveMsg  string
@@ -25,7 +23,7 @@ type editorScreen struct {
 	width, height int
 }
 
-func newEditorScreen(client *rds.Client, store *storage.Store, initialSQL string) *editorScreen {
+func newEditorScreen(client *rds.Client, initialSQL string) *editorScreen {
 	ta := textarea.New()
 	ta.Placeholder = "SELECT * FROM ..."
 	ta.SetValue(initialSQL)
@@ -40,7 +38,6 @@ func newEditorScreen(client *rds.Client, store *storage.Store, initialSQL string
 
 	return &editorScreen{
 		client:   client,
-		store:    store,
 		textarea: ta,
 	}
 }
@@ -80,9 +77,7 @@ func (s *editorScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if sql == "" {
 				return s, nil
 			}
-			return s, func() tea.Msg {
-				return PushScreenMsg{Screen: newSaveScreen(s.store, sql, s.width)}
-			}
+			return s, func() tea.Msg { return openSavePromptMsg{sql: sql} }
 		}
 
 	case editorFinishedMsg:
@@ -155,14 +150,8 @@ func (s *editorScreen) executeQuery() tea.Cmd {
 		return nil
 	}
 
-	// Create query screen that will execute in background
-	queryScreen := newQueryScreen(query)
-	queryScreen.client = s.client
-	queryScreen.store = s.store
-	queryScreen.executing = true
-
 	return func() tea.Msg {
-		return submitQueryMsg{query: query, screen: queryScreen}
+		return openQueryMsg{query: query, execute: true}
 	}
 }
 
