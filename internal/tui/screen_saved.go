@@ -22,7 +22,7 @@ type savedScreen struct {
 func newSavedScreen(store *storage.Store) *savedScreen {
 	columns := []table.Column{
 		{Title: "Name", Width: 25},
-		{Title: "Created", Width: 20},
+		{Title: "Updated", Width: 20},
 		{Title: "SQL", Width: 40},
 	}
 
@@ -63,6 +63,10 @@ func (s *savedScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.width = msg.Width
 		s.height = msg.Height - 1 // account for footer
 		s.updateTableSize()
+
+	case querySavedMsg:
+		s.refreshTable()
+		return s, nil
 
 	case tea.KeyMsg:
 		switch msg.Type {
@@ -127,7 +131,7 @@ func (s *savedScreen) updateTableSize() {
 
 	s.table.SetColumns([]table.Column{
 		{Title: "Name", Width: nameWidth},
-		{Title: "Created", Width: createdWidth},
+		{Title: "Updated", Width: createdWidth},
 		{Title: "SQL", Width: sqlWidth},
 	})
 }
@@ -147,7 +151,7 @@ func (s *savedScreen) refreshTable() {
 	for i, q := range s.queries {
 		rows[i] = table.Row{
 			q.Name,
-			q.CreatedAt.Format("2006-01-02 15:04"),
+			q.UpdatedAt.Format("2006-01-02 15:04"),
 			truncateSQL(q.SQL, 50),
 		}
 	}

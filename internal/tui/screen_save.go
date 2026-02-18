@@ -69,13 +69,14 @@ func (s *saveScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return s, func() tea.Msg { return PopScreenMsg{} }
 			}
 
-			if err := s.store.Save(name, s.sql); err != nil {
+			actualName, err := s.store.Save(name, s.sql)
+			if err != nil {
 				return s, func() tea.Msg { return PopScreenMsg{} }
 			}
 
 			return s, tea.Sequence(
 				func() tea.Msg { return PopScreenMsg{} },
-				func() tea.Msg { return querySavedMsg{name: name} },
+				func() tea.Msg { return querySavedMsg{name: actualName} },
 			)
 		}
 	}

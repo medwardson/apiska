@@ -4,71 +4,56 @@
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/ixti/apiska/internal/exporters"
 )
+
+var unsafeCharsRe = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1f]`)
 
 // SavedQuery represents a query saved for later use -- a track in your crate.
 type SavedQuery struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	SQL       string    `json:"sql"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-// queriesFile is the JSON structure for persisting queries to disk.
-type queriesFile struct {
-	Queries []SavedQuery `json:"queries"`
+	ID        string
+	Name      string
+	SQL       string
+	UpdatedAt time.Time
 }
 
 // Store manages saved queries persistence -- the record store that never closes.
+// Queries are stored as .sql files in ./.apiska/
 type Store struct {
-	mu      sync.RWMutex
-	path    string
-	queries []SavedQuery
+	mu   sync.RWMutex
+	path string
 }
 
-// NewStore creates a new Store loading from ~/.apiska/queries.json.
-// If the file doesn't exist, starts with an empty collection.
+// NewStore creates a new Store using ./.apiska/ for query files.
 func NewStore() (*Store, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	path := filepath.Join(home, ".apiska", "queries.json")
-	s := &Store{
-		path:    path,
-		queries: []SavedQuery{},
-	}
-
-	if err := s.load(); err != nil && !os.IsNotExist(err) {
-		return nil, err
-	}
-
-	return s, nil
+	return &Store{path: ".apiska"}, nil
 }
 
 // Save stores a query with the given name -- pressing a new record.
-func (s *Store) Save(name, sql string) error {
+// Returns the actual filename that was used.
+func (s *Store) Save(name, sql string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	query := SavedQuery{
-		ID:        fmt.Sprintf("q-%d", time.Now().UnixNano()),
-		Name:      name,
-		SQL:       sql,
-		CreatedAt: time.Now(),
+	if err := os.MkdirAll(s.path, 0755); err != nil {
+		return "", fmt.Errorf("failed to create .apiska directory: %w", err)
 	}
 
-	s.queries = append([]SavedQuery{query}, s.queries...)
-	return s.persist()
+	filename := sanitizeFilename(name) + ".sql"
+	filePath := uniqueFilePath(filepath.Join(s.path, filename))
+
+	if err := os.WriteFile(filePath, []byte(sql), 0644); err != nil {
+		return "", err
+	}
+
+	return filepath.Base(filePath), nil
 }
 
 // List returns all saved queries -- browsing the crate.
@@ -76,9 +61,42 @@ func (s *Store) List() []SavedQuery {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	result := make([]SavedQuery, len(s.queries))
-	copy(result, s.queries)
-	return result
+	entries, err := os.ReadDir(s.path)
+	if err != nil {
+		return []SavedQuery{}
+	}
+
+	var queries []SavedQuery
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+
+		filePath := filepath.Join(s.path, entry.Name())
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		name := strings.TrimSuffix(entry.Name(), ".sql")
+		queries = append(queries, SavedQuery{
+			ID:        entry.Name(),
+			Name:      name,
+			SQL:       string(content),
+			UpdatedAt: info.ModTime(),
+		})
+	}
+
+	sort.Slice(queries, func(i, j int) bool {
+		return queries[i].UpdatedAt.After(queries[j].UpdatedAt)
+	})
+
+	return queries
 }
 
 // Delete removes a saved query by ID -- pulling a record from the crate.
@@ -86,37 +104,40 @@ func (s *Store) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for i, q := range s.queries {
-		if q.ID == id {
-			s.queries = append(s.queries[:i], s.queries[i+1:]...)
-			return s.persist()
-		}
-	}
-	return nil
-}
-
-// load reads queries from disk -- opening the crate.
-func (s *Store) load() error {
-	data, err := os.ReadFile(s.path)
-	if err != nil {
+	filePath := filepath.Join(s.path, id)
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-
-	var file queriesFile
-	if err := json.Unmarshal(data, &file); err != nil {
-		return fmt.Errorf("failed to parse queries file: %w", err)
-	}
-
-	s.queries = file.Queries
 	return nil
 }
 
-// persist writes queries to disk -- closing the crate for the night.
-func (s *Store) persist() error {
-	file := queriesFile{Queries: s.queries}
-	_, err := exporters.WriteJson(s.path, func(enc *json.Encoder) error {
-		enc.SetIndent("", "  ")
-		return enc.Encode(file)
-	})
-	return err
+// sanitizeFilename converts a query name to a safe filename.
+func sanitizeFilename(name string) string {
+	name = strings.ToLower(name)
+	name = strings.ReplaceAll(name, " ", "_")
+	name = unsafeCharsRe.ReplaceAllString(name, "")
+	name = strings.Trim(name, "._ ")
+
+	if name == "" {
+		name = "query"
+	}
+
+	return name
+}
+
+// uniqueFilePath returns a unique file path by appending a numeric suffix if needed.
+func uniqueFilePath(filePath string) string {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return filePath
+	}
+
+	ext := filepath.Ext(filePath)
+	base := strings.TrimSuffix(filePath, ext)
+
+	for i := 1; ; i++ {
+		newPath := fmt.Sprintf("%s_%d%s", base, i, ext)
+		if _, err := os.Stat(newPath); os.IsNotExist(err) {
+			return newPath
+		}
+	}
 }

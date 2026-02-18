@@ -170,6 +170,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screens[0] = updated.(Screen)
 		}
 		return m, cmd
+
+	case querySavedMsg:
+		// Forward to all screens so any savedScreen in the stack can refresh with new saved query list
+		for i := range m.screens {
+			updated, _ := m.screens[i].Update(msg)
+			m.screens[i] = updated.(Screen)
+		}
+		return m, nil
 	}
 
 	// Delegate to the current screen
@@ -238,21 +246,3 @@ func NewProgram(client *rds.Client, store *storage.Store) *tea.Program {
 		screens: []Screen{newHomeScreen()},
 	})
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

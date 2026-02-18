@@ -13,123 +13,147 @@ import (
 )
 
 func TestStore_SaveAndList(t *testing.T) {
-	// Create temp directory for test
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "queries.json")
+	store := &Store{path: tmpDir}
 
-	store := &Store{path: path, queries: []SavedQuery{}}
-
-	// Save a query
-	err := store.Save("Test Query", "SELECT * FROM users")
+	actualName, err := store.Save("Test Query", "SELECT * FROM users")
 	require.NoError(t, err)
+	assert.Equal(t, "test_query.sql", actualName)
 
-	// List should return the saved query
 	queries := store.List()
 	require.Len(t, queries, 1)
-	assert.Equal(t, "Test Query", queries[0].Name)
+	assert.Equal(t, "test_query", queries[0].Name)
 	assert.Equal(t, "SELECT * FROM users", queries[0].SQL)
-	assert.NotEmpty(t, queries[0].ID)
-	assert.False(t, queries[0].CreatedAt.IsZero())
+	assert.Equal(t, "test_query.sql", queries[0].ID)
+	assert.False(t, queries[0].UpdatedAt.IsZero())
+
+	// Verify file exists
+	_, err = os.Stat(filepath.Join(tmpDir, "test_query.sql"))
+	require.NoError(t, err)
 }
 
 func TestStore_SaveMultiple(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "queries.json")
+	store := &Store{path: tmpDir}
 
-	store := &Store{path: path, queries: []SavedQuery{}}
-
-	err := store.Save("Query 1", "SELECT 1")
+	_, err := store.Save("Query 1", "SELECT 1")
 	require.NoError(t, err)
 
-	err = store.Save("Query 2", "SELECT 2")
+	_, err = store.Save("Query 2", "SELECT 2")
 	require.NoError(t, err)
 
 	queries := store.List()
 	require.Len(t, queries, 2)
 
-	// Newest should be first
-	assert.Equal(t, "Query 2", queries[0].Name)
-	assert.Equal(t, "Query 1", queries[1].Name)
+	// Newest should be first (sorted by mod time)
+	assert.Equal(t, "query_2", queries[0].Name)
+	assert.Equal(t, "query_1", queries[1].Name)
+}
+
+func TestStore_SaveDuplicateName(t *testing.T) {
+	tmpDir := t.TempDir()
+	store := &Store{path: tmpDir}
+
+	name1, err := store.Save("Query", "SELECT 1")
+	require.NoError(t, err)
+	assert.Equal(t, "query.sql", name1)
+
+	name2, err := store.Save("Query", "SELECT 2")
+	require.NoError(t, err)
+	assert.Equal(t, "query_1.sql", name2)
+
+	queries := store.List()
+	require.Len(t, queries, 2)
+
+	// Should have both query.sql and query_1.sql
+	_, err = os.Stat(filepath.Join(tmpDir, "query.sql"))
+	require.NoError(t, err)
+	_, err = os.Stat(filepath.Join(tmpDir, "query_1.sql"))
+	require.NoError(t, err)
 }
 
 func TestStore_Delete(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "queries.json")
+	store := &Store{path: tmpDir}
 
-	store := &Store{path: path, queries: []SavedQuery{}}
-
-	err := store.Save("Query 1", "SELECT 1")
+	_, err := store.Save("Query 1", "SELECT 1")
 	require.NoError(t, err)
 
-	err = store.Save("Query 2", "SELECT 2")
+	_, err = store.Save("Query 2", "SELECT 2")
 	require.NoError(t, err)
 
 	queries := store.List()
 	require.Len(t, queries, 2)
 
-	// Delete first query
+	// Delete newest query
 	err = store.Delete(queries[0].ID)
 	require.NoError(t, err)
 
 	queries = store.List()
 	require.Len(t, queries, 1)
-	assert.Equal(t, "Query 1", queries[0].Name)
+	assert.Equal(t, "query_1", queries[0].Name)
 }
 
 func TestStore_DeleteNonExistent(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "queries.json")
-
-	store := &Store{path: path, queries: []SavedQuery{}}
+	store := &Store{path: tmpDir}
 
 	// Deleting non-existent ID should not error
-	err := store.Delete("nonexistent-id")
+	err := store.Delete("nonexistent.sql")
 	require.NoError(t, err)
 }
 
 func TestStore_Persistence(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "queries.json")
 
 	// Create first store and save
-	store1 := &Store{path: path, queries: []SavedQuery{}}
-	err := store1.Save("Persisted Query", "SELECT * FROM orders")
+	store1 := &Store{path: tmpDir}
+	_, err := store1.Save("Persisted Query", "SELECT * FROM orders")
 	require.NoError(t, err)
 
-	// Create second store and load from same file
-	store2 := &Store{path: path, queries: []SavedQuery{}}
-	err = store2.load()
-	require.NoError(t, err)
+	// Create second store pointing to same directory
+	store2 := &Store{path: tmpDir}
 
 	queries := store2.List()
 	require.Len(t, queries, 1)
-	assert.Equal(t, "Persisted Query", queries[0].Name)
+	assert.Equal(t, "persisted_query", queries[0].Name)
 	assert.Equal(t, "SELECT * FROM orders", queries[0].SQL)
 }
 
-func TestStore_LoadNonExistent(t *testing.T) {
+func TestStore_ListEmptyDirectory(t *testing.T) {
 	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "nonexistent.json")
+	store := &Store{path: tmpDir}
 
-	store := &Store{path: path, queries: []SavedQuery{}}
-	err := store.load()
-
-	assert.True(t, os.IsNotExist(err))
+	queries := store.List()
+	assert.Empty(t, queries)
 }
 
-func TestStore_ListReturnsDefensiveCopy(t *testing.T) {
-	tmpDir := t.TempDir()
-	path := filepath.Join(tmpDir, "queries.json")
+func TestStore_ListNonExistentDirectory(t *testing.T) {
+	store := &Store{path: "/nonexistent/path"}
 
-	store := &Store{path: path, queries: []SavedQuery{}}
-	err := store.Save("Original", "SELECT 1")
-	require.NoError(t, err)
-
-	// Modify the returned slice
 	queries := store.List()
-	queries[0].Name = "Modified"
+	assert.Empty(t, queries)
+}
 
-	// Original should be unchanged
-	queries2 := store.List()
-	assert.Equal(t, "Original", queries2[0].Name)
+func TestSanitizeFilename(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Simple Query", "simple_query"},
+		{"Query/With/Slashes", "querywithslashes"},
+		{"Query:With:Colons", "querywithcolons"},
+		{"Query<>With<>Brackets", "querywithbrackets"},
+		{"...", "query"},
+		{"", "query"},
+		{"   ", "query"},
+		{"Normal_Name", "normal_name"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := sanitizeFilename(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
