@@ -38,11 +38,6 @@ type openEditorMsg struct {
 // openSavedQueriesMsg opens the saved queries screen.
 type openSavedQueriesMsg struct{}
 
-// openSavePromptMsg opens the save prompt for the given SQL.
-type openSavePromptMsg struct {
-	sql string
-}
-
 // openQueryMsg opens a query screen to view/execute a query.
 type openQueryMsg struct {
 	query   *rds.Query
@@ -64,11 +59,6 @@ type queryExecutedMsg struct {
 type editorFinishedMsg struct {
 	editor *launchers.ExternalEditor
 	err    error
-}
-
-// querySavedMsg is sent when a query has been saved successfully.
-type querySavedMsg struct {
-	name string
 }
 
 // model is the root model that manages the screen stack and chrome.
@@ -122,9 +112,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case openSavedQueriesMsg:
 		return m, m.pushScreen(newSavedScreen(m.store))
 
-	case openSavePromptMsg:
-		return m, m.pushScreen(newSaveScreen(m.store, msg.sql, m.width))
-
 	case openQueryMsg:
 		// Add query to home screen history if executing
 		if msg.execute && len(m.screens) > 0 {
@@ -170,14 +157,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screens[0] = updated.(Screen)
 		}
 		return m, cmd
-
-	case querySavedMsg:
-		// Forward to all screens so any savedScreen in the stack can refresh with new saved query list
-		for i := range m.screens {
-			updated, _ := m.screens[i].Update(msg)
-			m.screens[i] = updated.(Screen)
-		}
-		return m, nil
 	}
 
 	// Delegate to the current screen

@@ -49,8 +49,7 @@ func (s *savedScreen) KeyHints() string {
 		return ""
 	}
 	return formatHint("↑↓", "navigate") +
-		styles.HintSep.String() + formatHint("enter", "load") +
-		styles.HintSep.String() + formatHint("d", "delete")
+		styles.HintSep.String() + formatHint("enter", "load")
 }
 
 func (s *savedScreen) Init() tea.Cmd {
@@ -64,10 +63,6 @@ func (s *savedScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.height = msg.Height - 1 // account for footer
 		s.updateTableSize()
 
-	case querySavedMsg:
-		s.refreshTable()
-		return s, nil
-
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEnter:
@@ -75,15 +70,6 @@ func (s *savedScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return s, func() tea.Msg {
 					return openEditorMsg{sql: q.SQL}
 				}
-			}
-			return s, nil
-		}
-
-		switch msg.String() {
-		case "d":
-			if q := s.selectedQuery(); q != nil {
-				s.store.Delete(q.ID)
-				s.refreshTable()
 			}
 			return s, nil
 		}

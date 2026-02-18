@@ -18,7 +18,6 @@ type editorScreen struct {
 	client   *rds.Client
 	textarea textarea.Model
 	err      error
-	saveMsg  string
 
 	width, height int
 }
@@ -48,7 +47,6 @@ func (s *editorScreen) Title() string {
 
 func (s *editorScreen) KeyHints() string {
 	return formatHint("F5/ctrl+r", "execute") +
-		styles.HintSep.String() + formatHint("ctrl+s", "save") +
 		styles.HintSep.String() + formatHint("ctrl+e", "external editor")
 }
 
@@ -64,20 +62,11 @@ func (s *editorScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.updateTextareaSize()
 
 	case tea.KeyMsg:
-		// Clear any status message when typing
-		s.saveMsg = ""
-
 		switch msg.Type {
 		case tea.KeyF5, tea.KeyCtrlR:
 			return s, s.executeQuery()
 		case tea.KeyCtrlE:
 			return s, s.openExternalEditor()
-		case tea.KeyCtrlS:
-			sql := strings.TrimSpace(s.textarea.Value())
-			if sql == "" {
-				return s, nil
-			}
-			return s, func() tea.Msg { return openSavePromptMsg{sql: sql} }
 		}
 
 	case editorFinishedMsg:
@@ -104,10 +93,6 @@ func (s *editorScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return s, nil
 		}
 		return s, nil
-
-	case querySavedMsg:
-		s.saveMsg = "Saved: " + msg.name
-		return s, nil
 	}
 
 	var cmd tea.Cmd
@@ -121,9 +106,6 @@ func (s *editorScreen) View() string {
 	if s.err != nil {
 		errStyle := lipgloss.NewStyle().Foreground(styles.Red)
 		content = s.textarea.View() + "\n" + errStyle.Render("Error: "+s.err.Error())
-	} else if s.saveMsg != "" {
-		msgStyle := lipgloss.NewStyle().Foreground(styles.Green)
-		content = s.textarea.View() + "\n" + msgStyle.Render(s.saveMsg)
 	} else {
 		content = s.textarea.View()
 	}
