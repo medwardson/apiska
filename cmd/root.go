@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/ixti/apiska/internal/rds"
+	"github.com/ixti/apiska/internal/storage"
 	"github.com/ixti/apiska/internal/tui"
 )
 
@@ -66,7 +67,12 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize AWS RDS client: %w", err)
 	}
 
-	p := tui.NewProgram(client)
+	store, err := storage.NewStore()
+	if err != nil {
+		return fmt.Errorf("failed to initialize saved queries store: %w", err)
+	}
+
+	p := tui.NewProgram(client, store)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("unexpected apiska error: %v", err)
 		os.Exit(1)

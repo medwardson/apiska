@@ -17,6 +17,7 @@ import (
 	"github.com/ixti/apiska/internal/formatters"
 	"github.com/ixti/apiska/internal/launchers"
 	"github.com/ixti/apiska/internal/rds"
+	"github.com/ixti/apiska/internal/storage"
 	"github.com/ixti/apiska/internal/tui/styles"
 )
 
@@ -33,6 +34,7 @@ type csvExportedMsg struct {
 
 type queryScreen struct {
 	client    *rds.Client
+	store     *storage.Store
 	query     *rds.Query
 	table     table.Model
 	executing bool
@@ -105,7 +107,7 @@ func (s *queryScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			initialSQL := s.query.SQL
 			return s, tea.Sequence(
 				func() tea.Msg { return PopScreenMsg{} },
-				func() tea.Msg { return PushScreenMsg{Screen: newEditorScreen(s.client, initialSQL)} },
+				func() tea.Msg { return PushScreenMsg{Screen: newEditorScreen(s.client, s.store, initialSQL)} },
 			)
 		case tea.KeyCtrlE:
 			// Export as CSV

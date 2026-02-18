@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/ixti/apiska/internal/launchers"
 	"github.com/ixti/apiska/internal/rds"
+	"github.com/ixti/apiska/internal/storage"
 	"github.com/ixti/apiska/internal/tui/styles"
 )
 
@@ -58,9 +59,20 @@ type submitQueryMsg struct {
 	screen Screen
 }
 
+// loadSavedQueryMsg is sent when a saved query should be loaded into a new editor.
+type loadSavedQueryMsg struct {
+	sql string
+}
+
+// querySavedMsg is sent when a query has been saved successfully.
+type querySavedMsg struct {
+	name string
+}
+
 // model is the root model that manages the screen stack and chrome.
 type model struct {
 	client *rds.Client
+	store  *storage.Store
 
 	screens []Screen
 
@@ -154,6 +166,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.screens[len(m.screens)-1] = updated.(Screen)
 		}
 		return m, msg.screen.Init()
+
+	case loadSavedQueryMsg:
+		// Push editor with SQL (keep saved queries screen in stack for back navigation)
+		screen := newEditorScreen(m.client, m.store, msg.sql)
+		m.screens = append(m.screens, screen)
+		if m.width > 0 && m.height > 0 {
+			updated, _ := screen.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			m.screens[len(m.screens)-1] = updated.(Screen)
+		}
+		return m, screen.Init()
 	}
 
 	// Delegate to the current screen
@@ -210,10 +232,11 @@ func (m model) ContentSize() (width, height int) {
 	return m.width, m.height - 1
 }
 
-func NewProgram(client *rds.Client) *tea.Program {
+func NewProgram(client *rds.Client, store *storage.Store) *tea.Program {
 	return tea.NewProgram(model{
 		client:  client,
-		screens: []Screen{newHomeScreen(client)},
+		store:   store,
+		screens: []Screen{newHomeScreen(client, store)},
 	})
 }
 

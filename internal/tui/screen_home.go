@@ -8,18 +8,20 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/ixti/apiska/internal/rds"
+	"github.com/ixti/apiska/internal/storage"
 	"github.com/ixti/apiska/internal/tui/styles"
 )
 
 type homeScreen struct {
 	client  *rds.Client
+	store   *storage.Store
 	queries []*rds.Query
 	table   table.Model
 
 	width, height int
 }
 
-func newHomeScreen(client *rds.Client) *homeScreen {
+func newHomeScreen(client *rds.Client, store *storage.Store) *homeScreen {
 	columns := []table.Column{
 		{Title: "Label", Width: 20},
 		{Title: "Time", Width: 20},
@@ -33,6 +35,7 @@ func newHomeScreen(client *rds.Client) *homeScreen {
 
 	return &homeScreen{
 		client:  client,
+		store:   store,
 		queries: []*rds.Query{},
 		table:   t,
 	}
@@ -43,7 +46,7 @@ func (s *homeScreen) Title() string {
 }
 
 func (s *homeScreen) KeyHints() string {
-	hints := formatHint("ctrl+n", "new query")
+	hints := formatHint("ctrl+n", "new query") + styles.HintSep.String() + formatHint("ctrl+l", "saved")
 
 	if len(s.queries) > 0 {
 		hints = formatHint("↑↓", "navigate") +
@@ -71,6 +74,7 @@ func (s *homeScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if q := s.selectedQuery(); q != nil {
 				screen := newQueryScreen(q)
 				screen.client = s.client
+				screen.store = s.store
 				return s, func() tea.Msg {
 					return PushScreenMsg{Screen: screen}
 				}
@@ -79,7 +83,12 @@ func (s *homeScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyCtrlN:
 			return s, func() tea.Msg {
-				return PushScreenMsg{Screen: newEditorScreen(s.client, "")}
+				return PushScreenMsg{Screen: newEditorScreen(s.client, s.store, "")}
+			}
+
+		case tea.KeyCtrlL:
+			return s, func() tea.Msg {
+				return PushScreenMsg{Screen: newSavedScreen(s.store)}
 			}
 		}
 
